@@ -123,9 +123,9 @@ ar-viewer/
 ### `model://` 프로토콜
 
 - glTF가 `.bin`과 텍스처를 상대 경로로 참조하므로, blob URL이 아니라 실제 경로를 기반으로 한 URL을 사용한다.
-- 창별로 허용 폴더를 하나씩 관리한다(마지막으로 연 파일의 폴더).
+- 허용 폴더는 앱 전체에서 하나의 집합으로 관리한다. 어느 창에서든 파일을 열면 그 파일의 폴더가 추가된다. (`protocol.handle`은 요청한 창을 알 수 없어서 창별 관리는 하지 않는다)
 - 요청 경로를 정규화한 뒤 허용 폴더 하위인지 검사한다. 하위가 아니면(`../` 우회 포함) 403을 반환한다.
-- 파일이 없으면 404를 반환하고, 해당 경로를 렌더러에 "누락 파일"로 알린다.
+- 파일이 없으면 404를 반환하고, 해당 경로를 "누락 파일" 목록에 기록한다. 렌더러는 모델의 `load` 또는 `error` 이벤트 뒤에 이 목록을 가져가서(가져가면 비워짐) 경고로 표시한다. 새 파일을 열 때도 목록을 비운다.
 
 ### 리셋
 
@@ -146,7 +146,9 @@ ar-viewer/
   ModelViewerElement.ktx2TranscoderLocation = '<앱 내부>/basis/'
   ModelViewerElement.meshoptDecoderLocation = '<앱 내부>/meshopt_decoder.js'
   ```
-- 디코더 파일은 설치된 `three` 패키지(model-viewer가 의존)의 `examples/jsm/libs/`에서 빌드 시 복사해 버전을 일치시킨다.
+- 디코더 파일은 설치된 `three` 패키지(model-viewer가 의존)의 `examples/jsm/libs/`에서 `npm install` 시(postinstall) 복사해 버전을 일치시킨다.
+- Meshopt 디코더는 model-viewer 번들에 이미 들어 있다. 하지만 `meshoptDecoderLocation`이 지정돼야 활성화되므로, 빈 로컬 스크립트(`meshopt-ready.js`)를 지정한다.
+- 설정은 `self.ModelViewerElement` 전역 객체로 하고, `@google/model-viewer`를 import하기 전에 실행한다.
 - CSP로 `connect-src`, `script-src` 등을 `'self'`와 `model:`로 제한한다.
 - main의 `session.webRequest.onBeforeRequest`에서 `http(s)://` 요청을 모두 취소하고 로그를 남긴다.
 - `neutral` 환경맵은 코드로 생성되므로 네트워크가 필요 없다.
@@ -167,7 +169,8 @@ ar-viewer/
 - **단위 (Vitest)**
   - 확장자 검사
   - 경로 ↔ `model://` URL 변환 (공백, 한글, Windows 드라이브 문자 경로 포함)
-  - 허용 폴더 검사 (`../` 우회, 심볼릭 경로 정규화)
+  - 허용 폴더 검사 (`../` 및 인코딩된 `%2E%2E` 우회)
+  - 리셋 시 카메라 기본값 적용
 - **E2E (Playwright + Electron)**
   - 앱 실행 → 빈 화면 표시
   - GLB 열기 → `load` 이벤트 → 창 제목에 파일명 표시
@@ -181,7 +184,7 @@ ar-viewer/
 
 - `npm run build:mac` → `.dmg` (arm64 + x64)
 - `npm run build:win` → NSIS `.exe` (x64)
-- 코드 서명 없음(사내 배포). 설치 안내 문서에 아래 내용을 적는다.
-  - macOS: "확인되지 않은 개발자" → Finder에서 우클릭 → 열기
+- 정식 코드 서명 없음(사내 배포). macOS는 Apple Silicon 실행을 위해 ad-hoc 서명(`identity: "-"`)만 한다. 설치 안내 문서에 아래 내용을 적는다.
+  - macOS 15 이상: 처음 실행하면 차단됨 → 시스템 설정 → 개인정보 보호 및 보안 → "그래도 열기". 또는 터미널에서 `xattr -dr com.apple.quarantine "/Applications/AR Viewer.app"`
   - Windows: SmartScreen → "추가 정보" → "실행"
 - Windows 설치 파일은 Windows PC에서 빌드하는 것을 권장한다.
